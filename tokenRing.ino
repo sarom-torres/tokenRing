@@ -8,13 +8,14 @@ const byte writerPin = 13;
 const byte readerPin = 2;
 
 uint32_t countBit = 0; // contador de bits transmitidos
-byte dataSend = B00000011;
-uint8_t dataReceived;
+byte dataSend = B00000111;
+byte dataReceived;
 
 TimerHandle_t xTimerPeriodic = NULL;
 TimerHandle_t xTimerSignal = NULL;
 TimerHandle_t xTimerReader = NULL;
 TimerHandle_t xTimerStartReading = NULL;
+
 BaseType_t xTimerSignalStarted = NULL;
 BaseType_t xTimerPeriodicStarted = NULL;
 BaseType_t xTimerReaderStarted = NULL;
@@ -58,9 +59,6 @@ void startMessage(TimerHandle_t xTimerSignal){
 }
 
 void messageGenerator (TimerHandle_t xTimerPeriodic){ //
-  //Serial.println("Message");
-//  if(digitalRead(writerPin) == HIGH) digitalWrite(writerPin,LOW);
-//  else digitalWrite(writerPin,HIGH);
 
   if(dataSend & B00000001){
     digitalWrite(writerPin,HIGH);
@@ -71,16 +69,19 @@ void messageGenerator (TimerHandle_t xTimerPeriodic){ //
   dataSend = dataSend >> 1; 
   countBit++;
   
+  Serial.print("Send ");
+  Serial.println(countBit);
+  
   if(countBit == 8){
     xTimerStop(xTimerPeriodic,0); // Checks if already transmited 8 bits then stop the timer
     digitalWrite(writerPin,HIGH); //Sets the port in HIGH after the transmission
+    countBit=0;
   }
-  Serial.print("Send ");
-  Serial.println(countBit);
 }
 
+
+
 void readerMessage(TimerHandle_t xTimerReader){
-  //Serial.println("Reading");
   if(digitalRead(readerPin) == HIGH) Serial.println("Received HIGH");
   else Serial.println("Received LOW");
 }
@@ -97,7 +98,7 @@ void startReadingMessage(TimerHandle_t xTimerStartReading){
 }
 
 void messageInterrupt(void){
-  detachInterrupt(readerPin);
+  detachInterrupt(digitalPinToInterrupt(readerPin));
   Serial.println("INT0");
   xTimerStartReadingStarted= xTimerStart(xTimerStartReading,0);
 }
@@ -105,6 +106,5 @@ void messageInterrupt(void){
 void TaskCounter(void *pvParameters) {
 
   (void) pvParameters;
-  for (;;) {
-  }
+  for (;;);
 }
