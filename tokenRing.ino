@@ -9,9 +9,17 @@ const byte readerPin = 2;
 
 uint32_t countBitSend = 0; // contador de bits transmitidos
 uint32_t countBitReceived = 0;
-//byte dataSend = B00000011;
-//byte dataReceived = B00000000;
 
+struct Frame{
+  byte stx = B00000010; // valor binário tabela ASCII
+  byte mac = B01010110; //0101->destino(Eq5) 0110->origem
+  byte port = 3;
+  byte data[10] = {4,5,6,7,8,9,10,11,12,13};
+  byte bcc = 14;
+  byte etx = B00000011; // tabela ASCII
+};
+
+Frame frame;
 
 byte dataSend;
 byte dataSend1 = 'A';
@@ -48,10 +56,10 @@ void setup() {
   digitalWrite(writerPin,HIGH);
 
   //timers create
-  xTimerPeriodic = xTimerCreate("Frame",1000/ portTICK_PERIOD_MS ,pdTRUE,0,byteGenerator); // Creates a periodic timer for sending de message
-  xTimerSignal = xTimerCreate("Start",1000/portTICK_PERIOD_MS,pdFALSE,0,startByte); // Creates the oneShot to initialize the transmission of the message
-  xTimerReader = xTimerCreate("Received",1000/ portTICK_PERIOD_MS ,pdTRUE,0,readerByte); // Creates a periodic timer to reader the message
-  xTimerStartReading= xTimerCreate("Start",500/portTICK_PERIOD_MS,pdFALSE,0,startReadingByte); // Creates the oneShot to initialize the reading of the message
+  xTimerPeriodic = xTimerCreate("Frame",200/ portTICK_PERIOD_MS ,pdTRUE,0,byteGenerator); // Creates a periodic timer for sending de message
+  xTimerSignal = xTimerCreate("Start",200/portTICK_PERIOD_MS,pdFALSE,0,startByte); // Creates the oneShot to initialize the transmission of the message
+  xTimerReader = xTimerCreate("Received",200/ portTICK_PERIOD_MS ,pdTRUE,0,readerByte); // Creates a periodic timer to reader the message
+  xTimerStartReading= xTimerCreate("Start",100/portTICK_PERIOD_MS,pdFALSE,0,startReadingByte); // Creates the oneShot to initialize the reading of the message
 
   //Tasks
   xTaskCreate(TaskSender, (const portCHAR*)"Sender", 256, NULL, 1, NULL);
@@ -60,8 +68,8 @@ void setup() {
   //xTimerSignalStarted = xTimerStart(xTimerSignal,0); // Initializes the one_shot
 
   //Data Queues
-  xQueueSend = xQueueCreate(5,sizeof(uint8_t));
-  xQueueStorage = xQueueCreate(5,sizeof(uint8_t)); 
+  xQueueSend = xQueueCreate(15,sizeof(uint8_t));
+  xQueueStorage = xQueueCreate(15,sizeof(uint8_t)); 
 
   //Semaphore
   xSemaphoreTransmission = xSemaphoreCreateBinary();
@@ -109,9 +117,24 @@ void byteGenerator (TimerHandle_t xTimerPeriodic){ //
 
 void carry_Queue(QueueHandle_t xQueueCarry){ //carrega os dados a serem enviados na fila
   
-  BaseType_t xStatus = xQueueSendToBack(xQueueCarry,&dataSend1,0);
-  BaseType_t xStatus2 = xQueueSendToBack(xQueueCarry,&dataSend2,0);
-  BaseType_t xStatus3 = xQueueSendToBack(xQueueCarry,&dataSend3,0);
+//  BaseType_t xStatus = xQueueSendToBack(xQueueCarry,&dataSend1,0);
+//  BaseType_t xStatus2 = xQueueSendToBack(xQueueCarry,&dataSend2,0);
+//  BaseType_t xStatus3 = xQueueSendToBack(xQueueCarry,&dataSend3,0);
+  xQueueSendToBack(xQueueCarry,&frame.stx,0);
+  xQueueSendToBack(xQueueCarry,&frame.mac,0);
+  xQueueSendToBack(xQueueCarry,&frame.port,0);
+  xQueueSendToBack(xQueueCarry,&frame.data[0],0);
+  xQueueSendToBack(xQueueCarry,&frame.data[1],0);
+  xQueueSendToBack(xQueueCarry,&frame.data[2],0);
+  xQueueSendToBack(xQueueCarry,&frame.data[3],0);
+  xQueueSendToBack(xQueueCarry,&frame.data[4],0);
+  xQueueSendToBack(xQueueCarry,&frame.data[5],0);
+  xQueueSendToBack(xQueueCarry,&frame.data[6],0);
+  xQueueSendToBack(xQueueCarry,&frame.data[7],0);
+  xQueueSendToBack(xQueueCarry,&frame.data[8],0);
+  xQueueSendToBack(xQueueCarry,&frame.data[9],0);
+  xQueueSendToBack(xQueueCarry,&frame.bcc,0);
+  xQueueSendToBack(xQueueCarry,&frame.etx,0);
   
 }
 
@@ -129,6 +152,15 @@ void send_message(QueueHandle_t xQueueTemp){ //o envio dos dados que estão na f
 }
 
 /**** Leitura das mensagens ****/
+
+void startReadingByte(TimerHandle_t xTimerStartReading){
+  if(digitalRead(readerPin) == LOW){
+    xTimerReaderStarted = xTimerStart(xTimerReader,0); // Initializes the timer to reader the message
+    Serial.println("startReadingMessage: Received StartBit");
+  }else{
+    attachInterrupt(digitalPinToInterrupt(readerPin), messageInterrupt, FALLING);
+  }
+}
 
 void readerByte(TimerHandle_t xTimerReader){
 
@@ -148,18 +180,6 @@ void readerByte(TimerHandle_t xTimerReader){
   }else{
     dataReceived = dataReceived >> 1;  
   }
-
-  
-}
-
-void startReadingByte(TimerHandle_t xTimerStartReading){
-  if(digitalRead(readerPin) == LOW){
-    xTimerReaderStarted = xTimerStart(xTimerReader,0); // Initializes the timer to reader the message
-    Serial.println("startReadingMessage: Received StartBit");
-  }else{
-    attachInterrupt(digitalPinToInterrupt(readerPin), messageInterrupt, FALLING);
-  }
-  
 }
 
 /*** Interrupções ***/
