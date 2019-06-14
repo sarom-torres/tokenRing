@@ -7,9 +7,15 @@
 const byte writerPin = 13;
 const byte readerPin = 2;
 
-uint32_t countBit = 0; // contador de bits transmitidos
-byte dataSend = B00000111;
-byte dataReceived;
+uint32_t countBitSend = 0; // contador de bits transmitidos
+uint32_t countBitReceived = 0;
+//byte dataSend = B00000011;
+//byte dataReceived = B00000000;
+
+byte dataSend = B01001111;
+byte dataReceived = B00000000;
+
+bool flagStopSend = false; // Flag for to stop the transmission
 
 TimerHandle_t xTimerPeriodic = NULL;
 TimerHandle_t xTimerSignal = NULL;
@@ -55,35 +61,44 @@ void startMessage(TimerHandle_t xTimerSignal){
   Serial.println("Init Transmission");
   digitalWrite(writerPin,LOW);
   xTimerPeriodicStarted = xTimerStart(xTimerPeriodic,0);// Initializes the timer
+  Serial.print("Dado a ser enviado:");
+  Serial.println(dataSend);
   
 }
 
 void messageGenerator (TimerHandle_t xTimerPeriodic){ //
 
-  if(dataSend & B00000001){
-    digitalWrite(writerPin,HIGH);
+  if(flagStopSend){
+    xTimerStop(xTimerPeriodic,0);
+    digitalWrite(writerPin,HIGH); //Sets the port in HIGH after the transmission
+    countBitSend=0;
   }else{
-    digitalWrite(writerPin,LOW);  
+      if(dataSend & B00000001) digitalWrite(writerPin,HIGH); 
+      else digitalWrite(writerPin,LOW); 
+
+      dataSend = dataSend >> 1; 
+      countBitSend++;
   }
 
-  dataSend = dataSend >> 1; 
-  countBit++;
+  if(countBitSend == 8)flagStopSend = true;//Checks if already transmited 8 bits
   
-  Serial.print("Send ");
-  Serial.println(countBit);
-  
-  if(countBit == 8){
-    xTimerStop(xTimerPeriodic,0); // Checks if already transmited 8 bits then stop the timer
-    digitalWrite(writerPin,HIGH); //Sets the port in HIGH after the transmission
-    countBit=0;
-  }
 }
 
-
-
 void readerMessage(TimerHandle_t xTimerReader){
-  if(digitalRead(readerPin) == HIGH) Serial.println("Received HIGH");
-  else Serial.println("Received LOW");
+
+  if(digitalRead(readerPin) == HIGH) dataReceived = dataReceived | B10000000;
+  else dataReceived = dataReceived | B00000000;
+
+  countBitReceived++; 
+
+  if(countBitReceived == 8){
+    xTimerStop(xTimerReader,0); 
+    attachInterrupt(digitalPinToInterrupt(readerPin), messageInterrupt, FALLING);
+    Serial.print("Dado Recebido: ");
+    Serial.println(dataReceived);
+  }else{
+    dataReceived = dataReceived >> 1;  
+  }
 }
 
 void startReadingMessage(TimerHandle_t xTimerStartReading){
@@ -92,14 +107,12 @@ void startReadingMessage(TimerHandle_t xTimerStartReading){
     Serial.println("Received StartBit");
   }else{
     attachInterrupt(digitalPinToInterrupt(readerPin), messageInterrupt, FALLING);
-    Serial.println("Falso start");
   }
   
 }
 
 void messageInterrupt(void){
   detachInterrupt(digitalPinToInterrupt(readerPin));
-  Serial.println("INT0");
   xTimerStartReadingStarted= xTimerStart(xTimerStartReading,0);
 }
 
