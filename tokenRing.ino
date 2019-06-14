@@ -119,6 +119,7 @@ void readerMessage(TimerHandle_t xTimerReader){
     Serial.println(dataReceived);
     xQueueSendToBack(xQueueStorage,&dataReceived,0);
     dataReceived = B00000000;
+    countBitReceived = 0;
   }else{
     dataReceived = dataReceived >> 1;  
   }
@@ -150,7 +151,7 @@ void TaskSender(void *pvParameters) {
 
   int sizeQueue = uxQueueMessagesWaitingFromISR(xQueueSend);
 
-  while(sizeQueue <= 3){
+  while(sizeQueue <=3){
     Serial.println("Task Sender: Lendo da fila");
     xQueueReceive(xQueueSend, &dataSend, portMAX_DELAY);
     xTimerSignalStarted = xTimerStart(xTimerSignal,0);
