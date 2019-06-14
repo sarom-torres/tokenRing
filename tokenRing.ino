@@ -48,10 +48,10 @@ void setup() {
   digitalWrite(writerPin,HIGH);
 
   //timers create
-  xTimerPeriodic = xTimerCreate("Frame",1000/ portTICK_PERIOD_MS ,pdTRUE,0,messageGenerator); // Creates a periodic timer for sending de message
-  xTimerSignal = xTimerCreate("Start",1000/portTICK_PERIOD_MS,pdFALSE,0,startMessage); // Creates the oneShot to initialize the transmission of the message
-  xTimerReader = xTimerCreate("Received",1000/ portTICK_PERIOD_MS ,pdTRUE,0,readerMessage); // Creates a periodic timer to reader the message
-  xTimerStartReading= xTimerCreate("Start",500/portTICK_PERIOD_MS,pdFALSE,0,startReadingMessage); // Creates the oneShot to initialize the reading of the message
+  xTimerPeriodic = xTimerCreate("Frame",1000/ portTICK_PERIOD_MS ,pdTRUE,0,byteGenerator); // Creates a periodic timer for sending de message
+  xTimerSignal = xTimerCreate("Start",1000/portTICK_PERIOD_MS,pdFALSE,0,startByte); // Creates the oneShot to initialize the transmission of the message
+  xTimerReader = xTimerCreate("Received",1000/ portTICK_PERIOD_MS ,pdTRUE,0,readerByte); // Creates a periodic timer to reader the message
+  xTimerStartReading= xTimerCreate("Start",500/portTICK_PERIOD_MS,pdFALSE,0,startReadingByte); // Creates the oneShot to initialize the reading of the message
 
   //Tasks
   xTaskCreate(TaskSender, (const portCHAR*)"Sender", 256, NULL, 1, NULL);
@@ -74,13 +74,15 @@ void loop() {
 
 }
 
-void startMessage(TimerHandle_t xTimerSignal){
+/**** Envio das mensagens ****/
+
+void startByte(TimerHandle_t xTimerSignal){
   Serial.println("startMessage: Init Transmission");
   digitalWrite(writerPin,LOW);
   xTimerPeriodicStarted = xTimerStart(xTimerPeriodic,0);// Initializes the timer
 }
 
-void messageGenerator (TimerHandle_t xTimerPeriodic){ //
+void byteGenerator (TimerHandle_t xTimerPeriodic){ //
 
   if (countBitSend == 0) { // For to test the dataSend
       Serial.print("messageGenerator: Dado a ser enviado:");
@@ -105,7 +107,30 @@ void messageGenerator (TimerHandle_t xTimerPeriodic){ //
   
 }
 
-void readerMessage(TimerHandle_t xTimerReader){
+void carry_Queue(QueueHandle_t xQueueCarry){ //carrega os dados a serem enviados na fila
+  
+  BaseType_t xStatus = xQueueSendToBack(xQueueCarry,&dataSend1,0);
+  BaseType_t xStatus2 = xQueueSendToBack(xQueueCarry,&dataSend2,0);
+  BaseType_t xStatus3 = xQueueSendToBack(xQueueCarry,&dataSend3,0);
+  
+}
+
+void send_message(QueueHandle_t xQueueTemp){ //o envio dos dados que estão na fila de envio
+
+  int sizeQueue = uxQueueMessagesWaitingFromISR(xQueueTemp);
+  int cont = 0;
+
+  while(cont < sizeQueue){ //laço para retirar o dado da fila e iniciar a transmissão
+    Serial.println("Task Sender: Lendo da fila");
+    xQueueReceive(xQueueTemp, &dataSend, portMAX_DELAY);
+    xTimerSignalStarted = xTimerStart(xTimerSignal,0);
+    xSemaphoreTake(xSemaphoreTransmission,portMAX_DELAY); // Wait the transmission to finish
+  }
+}
+
+/**** Leitura das mensagens ****/
+
+void readerByte(TimerHandle_t xTimerReader){
 
   if(digitalRead(readerPin) == HIGH) dataReceived = dataReceived | B10000000;
   else dataReceived = dataReceived | B00000000;
@@ -127,7 +152,7 @@ void readerMessage(TimerHandle_t xTimerReader){
   
 }
 
-void startReadingMessage(TimerHandle_t xTimerStartReading){
+void startReadingByte(TimerHandle_t xTimerStartReading){
   if(digitalRead(readerPin) == LOW){
     xTimerReaderStarted = xTimerStart(xTimerReader,0); // Initializes the timer to reader the message
     Serial.println("startReadingMessage: Received StartBit");
@@ -137,26 +162,21 @@ void startReadingMessage(TimerHandle_t xTimerStartReading){
   
 }
 
+/*** Interrupções ***/
+
 void messageInterrupt(void){
   detachInterrupt(digitalPinToInterrupt(readerPin));
   xTimerStartReadingStarted= xTimerStart(xTimerStartReading,0);
 }
 
+/*** Tarefas ***/
+
 void TaskSender(void *pvParameters) {
   (void) pvParameters;
 
-  BaseType_t xStatus = xQueueSendToBack(xQueueSend,&dataSend1,0);
-  BaseType_t xStatus2 = xQueueSendToBack(xQueueSend,&dataSend2,0);
-  BaseType_t xStatus3 = xQueueSendToBack(xQueueSend,&dataSend3,0);
+  carry_Queue(xQueueSend);
+  send_message(xQueueSend);
 
-  int sizeQueue = uxQueueMessagesWaitingFromISR(xQueueSend);
-
-  while(sizeQueue <=3){
-    Serial.println("Task Sender: Lendo da fila");
-    xQueueReceive(xQueueSend, &dataSend, portMAX_DELAY);
-    xTimerSignalStarted = xTimerStart(xTimerSignal,0);
-    xSemaphoreTake(xSemaphoreTransmission,portMAX_DELAY);
-  }
   for(;;);
 }
 
