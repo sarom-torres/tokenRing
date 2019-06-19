@@ -9,10 +9,12 @@ const byte readerPin = 2;
 
 uint32_t countBitSend = 0; // contador de bits transmitidos
 uint32_t countBitReceived = 0;
+uint32_t countByteMac = 0;
 
 struct Frame{
   byte stx = B00000010; // valor binário tabela ASCII
   byte mac = B11011110; //1101->destino(Eq5) 1110->origem
+//  byte mac = B10011110; //1101->destino(Eq5) 1110->origem
   byte port = B11000000;
   byte data[10] = {245,246,247,248,249,250,251,252,253,254};
   byte bcc = 200;
@@ -28,6 +30,7 @@ byte dataSend3 = 'O';
 byte dataReceived = B00000000;
 
 bool flagStopSend = false; // Flag for to stop the transmission
+bool flagIsDestiny = false;
 
 TimerHandle_t xTimerPeriodic = NULL;
 TimerHandle_t xTimerSignal = NULL;
@@ -157,6 +160,7 @@ void startReadingByte(TimerHandle_t xTimerStartReading){
   if(digitalRead(readerPin) == LOW){
     xTimerReaderStarted = xTimerStart(xTimerReader,0); // Initializes the timer to reader the message
     Serial.println("startReadingMessage: Received StartBit");
+    countByteMac++;
   }else{
     attachInterrupt(digitalPinToInterrupt(readerPin), messageInterrupt, FALLING);
   }
@@ -175,11 +179,27 @@ void readerByte(TimerHandle_t xTimerReader){
     Serial.print("readerMessage: Dado Recebido: ");
     Serial.println(dataReceived);
     xQueueSendToBack(xQueueStorage,&dataReceived,0);
+
+    if(countByteMac == 1){
+      checkMessage(dataReceived);
+      if(flagIsDestiny)Serial.println("Desitno Verdadeiro");
+      else Serial.println("Destino falso");
+    }
     dataReceived = B00000000;
     countBitReceived = 0;
+    countByteMac = 0;
   }else{
     dataReceived = dataReceived >> 1;  
   }
+
+
+}
+
+void checkMessage(byte mac){
+
+  mac = mac >> 4;
+  if(mac == B00001101) flagIsDestiny = true;
+  else flagIsDestiny = false;
 }
 
 /*** Interrupções ***/
@@ -199,6 +219,7 @@ void TaskSender(void *pvParameters) {
 
   for(;;);
 }
+
 
 void TaskReceiver(void *pvParameters){
   (void) pvParameters;
