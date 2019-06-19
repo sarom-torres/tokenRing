@@ -12,10 +12,10 @@ uint32_t countBitReceived = 0;
 
 struct Frame{
   byte stx = B00000010; // valor binário tabela ASCII
-  byte mac = B01010110; //0101->destino(Eq5) 0110->origem
-  byte port = 3;
-  byte data[10] = {4,5,6,7,8,9,10,11,12,13};
-  byte bcc = 14;
+  byte mac = B11011110; //1101->destino(Eq5) 1110->origem
+  byte port = B11000000;
+  byte data[10] = {245,246,247,248,249,250,251,252,253,254};
+  byte bcc = 200;
   byte etx = B00000011; // tabela ASCII
 };
 
@@ -46,7 +46,6 @@ BaseType_t xTimerStartReadingStarted = NULL;
 
 void messageGenerator (TimerHandle_t xTimerPeriodic); // CallBack to writer the mensagem
 void startMessage(TimerHandle_t xTimerSignal); //CallBack to initialize the transmission of the message
-void TaskCounter(void *pvParameters);
 
 void setup() {
   Serial.begin(9600);
@@ -56,10 +55,10 @@ void setup() {
   digitalWrite(writerPin,HIGH);
 
   //timers create
-  xTimerPeriodic = xTimerCreate("Frame",200/ portTICK_PERIOD_MS ,pdTRUE,0,byteGenerator); // Creates a periodic timer for sending de message
-  xTimerSignal = xTimerCreate("Start",200/portTICK_PERIOD_MS,pdFALSE,0,startByte); // Creates the oneShot to initialize the transmission of the message
-  xTimerReader = xTimerCreate("Received",200/ portTICK_PERIOD_MS ,pdTRUE,0,readerByte); // Creates a periodic timer to reader the message
-  xTimerStartReading= xTimerCreate("Start",100/portTICK_PERIOD_MS,pdFALSE,0,startReadingByte); // Creates the oneShot to initialize the reading of the message
+  xTimerPeriodic = xTimerCreate("Frame",100/ portTICK_PERIOD_MS ,pdTRUE,0,byteGenerator); // Creates a periodic timer for sending de message
+  xTimerSignal = xTimerCreate("Start",100/portTICK_PERIOD_MS,pdFALSE,0,startByte); // Creates the oneShot to initialize the transmission of the message
+  xTimerReader = xTimerCreate("Received",100/ portTICK_PERIOD_MS ,pdTRUE,0,readerByte); // Creates a periodic timer to reader the message
+  xTimerStartReading= xTimerCreate("Start",50/portTICK_PERIOD_MS,pdFALSE,0,startReadingByte); // Creates the oneShot to initialize the reading of the message
 
   //Tasks
   xTaskCreate(TaskSender, (const portCHAR*)"Sender", 256, NULL, 1, NULL);
@@ -147,6 +146,7 @@ void send_message(QueueHandle_t xQueueTemp){ //o envio dos dados que estão na f
     Serial.println("Task Sender: Lendo da fila");
     xQueueReceive(xQueueTemp, &dataSend, portMAX_DELAY);
     xTimerSignalStarted = xTimerStart(xTimerSignal,0);
+    cont++;
     xSemaphoreTake(xSemaphoreTransmission,portMAX_DELAY); // Wait the transmission to finish
   }
 }
