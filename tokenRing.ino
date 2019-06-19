@@ -181,8 +181,8 @@ void readerByte(TimerHandle_t xTimerReader){
     xQueueSendToBack(xQueueStorage,&dataReceived,0);
 
     if(countByteMac == 1){
-      checkMessage(dataReceived);
-      if(flagIsDestiny)Serial.println("Desitno Verdadeiro");
+      checkDestiny(dataReceived);
+      if(flagIsDestiny)Serial.println("Destino Verdadeiro");
       else Serial.println("Destino falso");
     }
     dataReceived = B00000000;
@@ -191,15 +191,12 @@ void readerByte(TimerHandle_t xTimerReader){
   }else{
     dataReceived = dataReceived >> 1;  
   }
-
-
 }
 
-void checkMessage(byte mac){
+void checkDestiny(byte mac){
 
   mac = mac >> 4;
   if(mac == B00001101) flagIsDestiny = true;
-  else flagIsDestiny = false;
 }
 
 /*** Interrupções ***/
