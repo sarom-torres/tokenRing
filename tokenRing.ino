@@ -21,6 +21,13 @@ struct Frame{
   byte etx = B00000011; // tabela ASCII
 };
 
+struct Package{
+  byte mac = B11011110; //1101->destino(Eq5) 1110->origem
+//  byte mac = B10011110; //1101->destino(Eq5) 1110->origem
+  byte port = B11000000;
+  byte data[10] = {245,246,247,248,249,250,251,252,253,254};
+};
+
 Frame frame;
 
 byte dataSend;
@@ -39,7 +46,7 @@ TimerHandle_t xTimerReader = NULL;
 TimerHandle_t xTimerStartReading = NULL;
 
 QueueHandle_t xQueueSend = NULL;
-QueueHandle_t xQueueStorage = NULL;
+QueueHandle_t xQueueRetransmission = NULL;
 
 SemaphoreHandle_t xSemaphoreTransmission = NULL;
 
@@ -72,7 +79,7 @@ void setup() {
 
   //Data Queues
   xQueueSend = xQueueCreate(15,sizeof(uint8_t));
-  xQueueStorage = xQueueCreate(15,sizeof(uint8_t)); 
+  xQueueRetransmission = xQueueCreate(50,15); 
 
   //Semaphore
   xSemaphoreTransmission = xSemaphoreCreateBinary();
@@ -183,9 +190,12 @@ void readerByte(TimerHandle_t xTimerReader){
     
     if(countByteR == 1){
       checkDestiny(dataReceived);
-      if(flagIsDestiny)Serial.println("Destino Verdadeiro");
-      else Serial.println("Destino falso");
+      if(flagIsDestiny){
+        Serial.println("Destino Verdadeiro");
+        Package p1;
+      }else Serial.println("Destino falso");
     }
+    
     dataReceived = B00000000;
     countBitReceived = 0;
     countByteR = 0;
