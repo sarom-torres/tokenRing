@@ -9,7 +9,7 @@ const byte readerPin = 2;
 
 uint32_t countBitSend = 0; // contador de bits transmitidos
 uint32_t countBitReceived = 0;
-uint32_t countByteMac = 0;
+uint32_t countByteR = 0;
 
 struct Frame{
   byte stx = B00000010; // valor binário tabela ASCII
@@ -21,6 +21,12 @@ struct Frame{
   byte etx = B00000011; // tabela ASCII
 };
 
+struct Package{
+  byte mac = B11011110; //1101->destino(Eq5) 1110->origem
+  byte port = B11000000;
+  byte data[10] = {245,246,247,248,249,250,251,252,253,254};
+};
+
 Frame frame;
 
 byte dataSend;
@@ -28,6 +34,7 @@ byte dataSend1 = 'A';
 byte dataSend2 = 'L';
 byte dataSend3 = 'O';
 byte dataReceived = B00000000;
+byte frameReceived[15];
 
 bool flagStopSend = false; // Flag for to stop the transmission
 bool flagIsDestiny = false;
@@ -38,9 +45,10 @@ TimerHandle_t xTimerReader = NULL;
 TimerHandle_t xTimerStartReading = NULL;
 
 QueueHandle_t xQueueSend = NULL;
-QueueHandle_t xQueueStorage = NULL;
+QueueHandle_t xQueueRetransmission = NULL;
 
 SemaphoreHandle_t xSemaphoreTransmission = NULL;
+SemaphoreHandle_t xSemaphoreRouting = NULL;
 
 BaseType_t xTimerSignalStarted = NULL;
 BaseType_t xTimerPeriodicStarted = NULL;
@@ -65,16 +73,18 @@ void setup() {
 
   //Tasks
   xTaskCreate(TaskSender, (const portCHAR*)"Sender", 256, NULL, 1, NULL);
+  xTaskCreate(TaskReceiver, (const portCHAR*)"Sender", 256, NULL, 1, NULL);
 
   //timers start
   //xTimerSignalStarted = xTimerStart(xTimerSignal,0); // Initializes the one_shot
 
   //Data Queues
   xQueueSend = xQueueCreate(15,sizeof(uint8_t));
-  xQueueStorage = xQueueCreate(15,sizeof(uint8_t)); 
+  xQueueRetransmission = xQueueCreate(50,15); 
 
   //Semaphore
   xSemaphoreTransmission = xSemaphoreCreateBinary();
+  xSemaphoreRouting = xSemaphoreCreateBinary();
 
   //interrupt
   attachInterrupt(digitalPinToInterrupt(readerPin), messageInterrupt, FALLING);
@@ -160,7 +170,7 @@ void startReadingByte(TimerHandle_t xTimerStartReading){
   if(digitalRead(readerPin) == LOW){
     xTimerReaderStarted = xTimerStart(xTimerReader,0); // Initializes the timer to reader the message
     Serial.println("startReadingMessage: Received StartBit");
-    countByteMac++;
+    countByteR++;
   }else{
     attachInterrupt(digitalPinToInterrupt(readerPin), messageInterrupt, FALLING);
   }
@@ -173,31 +183,48 @@ void readerByte(TimerHandle_t xTimerReader){
 
   countBitReceived++; 
 
-  if(countBitReceived == 8){
+  if(countBitReceived == 8){ //Verifica se os 8 nits foram recebidos
     xTimerStop(xTimerReader,0); 
     attachInterrupt(digitalPinToInterrupt(readerPin), messageInterrupt, FALLING);
     Serial.print("readerMessage: Dado Recebido: ");
     Serial.println(dataReceived);
-    xQueueSendToBack(xQueueStorage,&dataReceived,0);
-
-    if(countByteMac == 1){
+    frameReceived[countByteR] = dataReceived;
+    
+    if(countByteR == 1){ //Verifica se o BYTE recebido é o MAC
       checkDestiny(dataReceived);
-      if(flagIsDestiny)Serial.println("Destino Verdadeiro");
-      else Serial.println("Destino falso");
+      if(flagIsDestiny){
+        Serial.println("Destino Verdadeiro");
+        
+      }else Serial.println("Destino falso");
+//    }else if(countByteR == 8){
+//      xSemaphoreGive(xSemaphoreRouting);
+//      countByteR = 0;
     }
+    
     dataReceived = B00000000;
     countBitReceived = 0;
-    countByteMac = 0;
-  }else{
+    countByteR = 0;
+    
+  }else{ // Caso os 8  bits não tenham sido recebidos apenas segue a serialização
     dataReceived = dataReceived >> 1;  
   }
 }
 
-void checkDestiny(byte mac){
+bool checkStx(byte stx){ //Checa se o byte é o STX """MUDAR"""
+  return stx == B00001101;
+}
 
+void checkDestiny(byte mac){ //Checa se o host é o destino
   mac = mac >> 4;
   if(mac == B00001101) flagIsDestiny = true;
 }
+
+//void carryPackage(Package package){ // Transfere os dados do frame recebido para ao pacote da aplicação
+//  package.mac = frameReceived [1];
+//  package.port = frameReceived[2];
+//  int i=3, j=0;
+//  while(i<13) package.data[j] = frameReceived[i]; j++; i++;
+//}
 
 /*** Interrupções ***/
 
@@ -210,7 +237,7 @@ void messageInterrupt(void){
 
 void TaskSender(void *pvParameters) {
   (void) pvParameters;
-
+  Serial.println("Tarefa Sender");
   carry_Queue(xQueueSend);
   send_message(xQueueSend);
 
@@ -220,6 +247,18 @@ void TaskSender(void *pvParameters) {
 
 void TaskReceiver(void *pvParameters){
   (void) pvParameters;
-  for (;;);
+
+  
+//  for (;;){
+//    xSemaphoreTake(xSemaphoreRouting,portMAX_DELAY);
+//    if(flagIsDestiny){
+//      Package p1;
+//      carryPackage(p1);
+//      Serial.print("Tarefa Encaminhamento : ");
+//      Serial.println(p1.mac);
+//    } 
+//  }
+
+  for(;;);
   
 }
