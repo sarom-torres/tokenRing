@@ -25,6 +25,7 @@ struct Package{
   byte mac;
   byte port;
   byte data[10];
+
 };
 
 Frame frame;
@@ -46,6 +47,7 @@ TimerHandle_t xTimerStartReading = NULL;
 
 QueueHandle_t xQueueSend = NULL;
 QueueHandle_t xQueueApp = NULL;
+
 QueueHandle_t xQueueRetransmission = NULL;
 
 SemaphoreHandle_t xSemaphoreTransmission = NULL;
@@ -148,14 +150,15 @@ void carry_Queue(QueueHandle_t xQueueCarry, Frame fr1){ //carrega os dados a ser
   xQueueSendToBack(xQueueCarry,&fr1.etx,0);
 }
 
-void frameCreate(Frame frame, Package p1){ // Cria um frame a partir de um pacote advindo da aplicação
+void frameCreate(Package p1){
 
-  frame.stx = B00000010;
+  Frame frame;
+  frame.stx = B00000010; // valor binário tabela ASCII 3
   frame.mac = p1.mac;
   frame.port = p1.port;
   for(int i=0; i<10;i++) frame.data[i] = p1.data[i];
   frame.bcc = p1.bcc;
-  frame.etx = B00000011;
+  frame.etx = B00000011; // tabela ASCII
   
 }
 void send_message(QueueHandle_t xQueueTemp){ //o envio dos dados que estão na fila de envio
@@ -204,12 +207,15 @@ void readerByte(TimerHandle_t xTimerReader){
               xSemaphoreGive(xSemaphoreRouting);
               countByteR = 0;
               break;
+
     }
     
     dataReceived = B00000000;
     countBitReceived = 0;
+
     
   }else{ // Caso os 8  bits não tenham sido recebidos apenas segue a serialização
+
     dataReceived = dataReceived >> 1;  
   }
 }
@@ -297,17 +303,18 @@ void TaskReceiver(void *pvParameters){
   
 }
 
-void TaskApplication1(void *pvParameters){ //Tarefa que representa uma aplicação e gera um packege a cada 3 segundos
+void TaskApplication1(void *pvParameters){
   (void) pvParameters;
   Package package;
   
   for(;;){
+   
     package.mac = B11011110;
     package.port = B11000000;
     package.bcc = 200;
+    
     for(int i = 0; i < 10; i++){
       package.data[i]= random(255);
     }
-    
     delay(3000);
   }
