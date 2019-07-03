@@ -12,8 +12,8 @@ uint32_t countBitReceived = 0;
 uint32_t countByteR = 0;
 
 struct Frame{
-  byte stx = B00000010; // valor binário tabela ASCII
-  byte mac = B11011110; //1101->destino(Eq5) 1110->origem
+  byte stx = B00000010; // valor binário tabela ASCII 3
+  byte mac = B10011110; //1101->destino(Eq5) 1110->origem
 //  byte mac = B10011110; //1101->destino(Eq5) 1110->origem
   byte port = B11000000;
   byte data[10] = {245,246,247,248,249,250,251,252,253,254};
@@ -22,9 +22,9 @@ struct Frame{
 };
 
 struct Package{
-  byte mac = B11011110; //1101->destino(Eq5) 1110->origem
-  byte port = B11000000;
-  byte data[10] = {245,246,247,248,249,250,251,252,253,254};
+  byte mac;
+  byte port;
+  byte data[10];
 };
 
 Frame frame;
@@ -45,6 +45,7 @@ TimerHandle_t xTimerReader = NULL;
 TimerHandle_t xTimerStartReading = NULL;
 
 QueueHandle_t xQueueSend = NULL;
+QueueHandle_t xQueueApp = NULL;
 QueueHandle_t xQueueRetransmission = NULL;
 
 SemaphoreHandle_t xSemaphoreTransmission = NULL;
@@ -60,6 +61,7 @@ void startMessage(TimerHandle_t xTimerSignal); //CallBack to initialize the tran
 
 void setup() {
   Serial.begin(9600);
+  //Serial.println("Setup");
 
   //pin
   pinMode(writerPin,OUTPUT);
@@ -80,7 +82,7 @@ void setup() {
 
   //Data Queues
   xQueueSend = xQueueCreate(15,sizeof(uint8_t));
-  xQueueRetransmission = xQueueCreate(50,15); 
+  xQueueApp = xQueueCreate(2,(sizeof(Package))); 
 
   //Semaphore
   xSemaphoreTransmission = xSemaphoreCreateBinary();
@@ -127,36 +129,43 @@ void byteGenerator (TimerHandle_t xTimerPeriodic){ //
   
 }
 
-void carry_Queue(QueueHandle_t xQueueCarry){ //carrega os dados a serem enviados na fila
+void carry_Queue(QueueHandle_t xQueueCarry, Frame fr1){ //carrega os dados a serem enviados na fila
   
-//  BaseType_t xStatus = xQueueSendToBack(xQueueCarry,&dataSend1,0);
-//  BaseType_t xStatus2 = xQueueSendToBack(xQueueCarry,&dataSend2,0);
-//  BaseType_t xStatus3 = xQueueSendToBack(xQueueCarry,&dataSend3,0);
-  xQueueSendToBack(xQueueCarry,&frame.stx,0);
-  xQueueSendToBack(xQueueCarry,&frame.mac,0);
-  xQueueSendToBack(xQueueCarry,&frame.port,0);
-  xQueueSendToBack(xQueueCarry,&frame.data[0],0);
-  xQueueSendToBack(xQueueCarry,&frame.data[1],0);
-  xQueueSendToBack(xQueueCarry,&frame.data[2],0);
-  xQueueSendToBack(xQueueCarry,&frame.data[3],0);
-  xQueueSendToBack(xQueueCarry,&frame.data[4],0);
-  xQueueSendToBack(xQueueCarry,&frame.data[5],0);
-  xQueueSendToBack(xQueueCarry,&frame.data[6],0);
-  xQueueSendToBack(xQueueCarry,&frame.data[7],0);
-  xQueueSendToBack(xQueueCarry,&frame.data[8],0);
-  xQueueSendToBack(xQueueCarry,&frame.data[9],0);
-  xQueueSendToBack(xQueueCarry,&frame.bcc,0);
-  xQueueSendToBack(xQueueCarry,&frame.etx,0);
-  
+  xQueueSendToBack(xQueueCarry,&fr1.stx,0);
+  xQueueSendToBack(xQueueCarry,&fr1.mac,0);
+  xQueueSendToBack(xQueueCarry,&fr1.port,0);
+  xQueueSendToBack(xQueueCarry,&fr1.data[0],0);
+  xQueueSendToBack(xQueueCarry,&fr1.data[1],0);
+  xQueueSendToBack(xQueueCarry,&fr1.data[2],0);
+  xQueueSendToBack(xQueueCarry,&fr1.data[3],0);
+  xQueueSendToBack(xQueueCarry,&fr1.data[4],0);
+  xQueueSendToBack(xQueueCarry,&fr1.data[5],0);
+  xQueueSendToBack(xQueueCarry,&fr1.data[6],0);
+  xQueueSendToBack(xQueueCarry,&fr1.data[7],0);
+  xQueueSendToBack(xQueueCarry,&fr1.data[8],0);
+  xQueueSendToBack(xQueueCarry,&fr1.data[9],0);
+  xQueueSendToBack(xQueueCarry,&fr1.bcc,0);
+  xQueueSendToBack(xQueueCarry,&fr1.etx,0);
 }
 
+void frameCreate(Package p1){
+
+  Frame frame;
+  frame.stx = B00000010; // valor binário tabela ASCII 3
+  frame.mac = p1.mac;
+  frame.port = p1.port;
+  for(int i=0; i<10;i++) frame.data[i] = p1.data[i];
+  frame.bcc = p1.bcc;
+  frame.etx = B00000011; // tabela ASCII
+  
+}
 void send_message(QueueHandle_t xQueueTemp){ //o envio dos dados que estão na fila de envio
 
   int sizeQueue = uxQueueMessagesWaitingFromISR(xQueueTemp);
   int cont = 0;
 
   while(cont < sizeQueue){ //laço para retirar o dado da fila e iniciar a transmissão
-    Serial.println("Task Sender: Lendo da fila");
+    //Serial.println("Task Sender: Lendo da fila");
     xQueueReceive(xQueueTemp, &dataSend, portMAX_DELAY);
     xTimerSignalStarted = xTimerStart(xTimerSignal,0);
     cont++;
@@ -169,7 +178,6 @@ void send_message(QueueHandle_t xQueueTemp){ //o envio dos dados que estão na f
 void startReadingByte(TimerHandle_t xTimerStartReading){
   if(digitalRead(readerPin) == LOW){
     xTimerReaderStarted = xTimerStart(xTimerReader,0); // Initializes the timer to reader the message
-    Serial.println("startReadingMessage: Received StartBit");
     countByteR++;
   }else{
     attachInterrupt(digitalPinToInterrupt(readerPin), messageInterrupt, FALLING);
@@ -183,27 +191,24 @@ void readerByte(TimerHandle_t xTimerReader){
 
   countBitReceived++; 
 
-  if(countBitReceived == 8){ //Verifica se os 8 nits foram recebidos
+  if(countBitReceived == 8){ //Verifica se os 8 bits foram recebidos
     xTimerStop(xTimerReader,0); 
     attachInterrupt(digitalPinToInterrupt(readerPin), messageInterrupt, FALLING);
     Serial.print("readerMessage: Dado Recebido: ");
     Serial.println(dataReceived);
-    frameReceived[countByteR] = dataReceived;
+    frameReceived[countByteR-1] = dataReceived;
     
-    if(countByteR == 1){ //Verifica se o BYTE recebido é o MAC
-      checkDestiny(dataReceived);
-      if(flagIsDestiny){
-        Serial.println("Destino Verdadeiro");
-        
-      }else Serial.println("Destino falso");
-//    }else if(countByteR == 8){
-//      xSemaphoreGive(xSemaphoreRouting);
-//      countByteR = 0;
+    switch(countByteR){
+      case 2: checkDestiny(dataReceived);
+              break;
+      case 15: 
+              xSemaphoreGive(xSemaphoreRouting);
+              countByteR = 0;
+              break;
     }
     
     dataReceived = B00000000;
     countBitReceived = 0;
-    countByteR = 0;
     
   }else{ // Caso os 8  bits não tenham sido recebidos apenas segue a serialização
     dataReceived = dataReceived >> 1;  
@@ -219,12 +224,50 @@ void checkDestiny(byte mac){ //Checa se o host é o destino
   if(mac == B00001101) flagIsDestiny = true;
 }
 
-//void carryPackage(Package package){ // Transfere os dados do frame recebido para ao pacote da aplicação
-//  package.mac = frameReceived [1];
-//  package.port = frameReceived[2];
-//  int i=3, j=0;
-//  while(i<13) package.data[j] = frameReceived[i]; j++; i++;
-//}
+void carryPackageApp(Package * package){ // Transfere os dados do frame recebido para ao pacote da aplicação
+  Serial.println("Entrou aqui na Carry");
+  package->mac = frameReceived [1];
+  package->port = frameReceived[2];
+  int i=3, j=0;
+  while(i<13){
+    package->data[j] = frameReceived[i]; 
+    j++; 
+    i++;
+  }
+}
+
+void sendRetransmition(){ //Carrega o frame com os dados recebidos e envia o frame para a fila de transmissão.
+
+  Frame frameR;
+  frameR.stx = frameReceived[0];
+  frameR.mac = frameReceived[1];
+  frameR.port = frameReceived[2];
+  int i=3, j=0;
+  while(i<13){
+    frameR.data[j] = frameReceived[i]; 
+    j++; 
+    i++;
+  } 
+  frameR.bcc = frameReceived[13];
+  frameR.etx = frameReceived[14];
+  Serial.println("sendRetransmition: Retransmitindo");
+  carry_Queue(xQueueSend,frameR);
+  
+}
+void routing(){
+    if(flagIsDestiny){
+      Serial.println("Entrou aqui na Rounting TRUE");
+      Package p1;
+      carryPackageApp(&p1);
+      Serial.println(p1.mac);
+      //xQueueSendToBack(xQueueApp,p1,0);
+    }else{
+      sendRetransmition();
+    }    
+}
+
+/**** Camada Aplicação *****/
+
 
 /*** Interrupções ***/
 
@@ -237,8 +280,7 @@ void messageInterrupt(void){
 
 void TaskSender(void *pvParameters) {
   (void) pvParameters;
-  Serial.println("Tarefa Sender");
-  carry_Queue(xQueueSend);
+  carry_Queue(xQueueSend,frame);
   send_message(xQueueSend);
 
   for(;;);
@@ -247,18 +289,27 @@ void TaskSender(void *pvParameters) {
 
 void TaskReceiver(void *pvParameters){
   (void) pvParameters;
-
   
-//  for (;;){
-//    xSemaphoreTake(xSemaphoreRouting,portMAX_DELAY);
-//    if(flagIsDestiny){
-//      Package p1;
-//      carryPackage(p1);
-//      Serial.print("Tarefa Encaminhamento : ");
-//      Serial.println(p1.mac);
-//    } 
-//  }
-
-  for(;;);
+  for (;;){
+    xSemaphoreTake(xSemaphoreRouting,portMAX_DELAY);
+    Serial.println("Entrou aqui na Task");
+    routing();
+  }
   
 }
+
+void TaskApplication1(void *pvParameters){
+  (void) pvParameters;
+  Package package;
+  
+  for(;;){
+   
+    package.mac = B11011110;
+    package.port = B11000000;
+    package.bcc = 200;
+    
+    for(int i = 0; i < 10; i++){
+      package.data[i]= random(255);
+    }
+    delay(3000);
+  }
