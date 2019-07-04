@@ -319,7 +319,6 @@ void TaskSenderApp(void *pvParameters){
     for(int i = 0; i < 10; i++) package.data[i]= random(255);
     xQueueSendToBack(xQueueTransApp,(void *)&package,0);
     delay(5000);
-    //random(255);
   }
 }
 
@@ -329,8 +328,7 @@ void TaskReceiverApp(void *pvParameters){
   for(;;){
     Package dataApp;
     xQueueReceive(xQueueApp, &dataApp, portMAX_DELAY);
-    Serial.println("Aplicação: ");
-    Serial.println(dataApp.data[0]);
+    Serial.println("Aplicação Recebeu Package");
   }
 }
 
