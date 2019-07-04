@@ -147,16 +147,7 @@ void carry_Queue(QueueHandle_t xQueueCarry, Frame fr1){ //carrega os dados a ser
   xQueueSendToBack(xQueueCarry,&fr1.stx,0);
   xQueueSendToBack(xQueueCarry,&fr1.mac,0);
   xQueueSendToBack(xQueueCarry,&fr1.port,0);
-  xQueueSendToBack(xQueueCarry,&fr1.data[0],0);
-  xQueueSendToBack(xQueueCarry,&fr1.data[1],0);
-  xQueueSendToBack(xQueueCarry,&fr1.data[2],0);
-  xQueueSendToBack(xQueueCarry,&fr1.data[3],0);
-  xQueueSendToBack(xQueueCarry,&fr1.data[4],0);
-  xQueueSendToBack(xQueueCarry,&fr1.data[5],0);
-  xQueueSendToBack(xQueueCarry,&fr1.data[6],0);
-  xQueueSendToBack(xQueueCarry,&fr1.data[7],0);
-  xQueueSendToBack(xQueueCarry,&fr1.data[8],0);
-  xQueueSendToBack(xQueueCarry,&fr1.data[9],0);
+  for(int i=0;i<10;i++) xQueueSendToBack(xQueueCarry,&fr1.data[i],0);
   xQueueSendToBack(xQueueCarry,&fr1.bcc,0);
   xQueueSendToBack(xQueueCarry,&fr1.etx,0);
 }
@@ -313,6 +304,7 @@ void TaskReceiver(void *pvParameters){
 
 void TaskSenderApp(void *pvParameters){
   (void) pvParameters;
+  
   Package package;
   
   for(;;){
