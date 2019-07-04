@@ -43,7 +43,7 @@ TimerHandle_t xTimerStartReading = NULL;
 QueueHandle_t xQueueSend = NULL;
 QueueHandle_t xQueueApp = NULL;
 
-QueueHandle_t xQueueRetransmission = NULL;
+QueueHandle_t xQueueTransmission = NULL;
 
 SemaphoreHandle_t xSemaphoreTransmission = NULL;
 SemaphoreHandle_t xSemaphoreRouting = NULL;
@@ -80,7 +80,7 @@ void setup() {
   //Data Queues
   xQueueSend = xQueueCreate(15,sizeof(uint8_t));
   xQueueApp = xQueueCreate(2,(sizeof(Package))); // fila para o envio do dado recebido para a aplicação
-  xQueueTransmissionApp = xQueueCreate(2,(sizeof(Package))); // fila para a receber dados da aplicação e enviar para outro equipamento
+  xQueueTransmission = xQueueCreate(5,(sizeof(Frame))); // fila para a receber dados da aplicação e enviar para outro equipamento
 
   //Semaphore
   xSemaphoreTransmission = xSemaphoreCreateBinary();
@@ -247,7 +247,7 @@ void sendRetransmition(){ //Carrega o frame com os dados recebidos e envia o fra
   frameR.bcc = frameReceived[13];
   frameR.etx = frameReceived[14];
   Serial.println("sendRetransmition: Retransmitindo");
-  carry_Queue(xQueueSend,frameR);
+  carry_Queue(xQueueSend,frameR); // isso n da certo
   
 }
 
@@ -275,7 +275,7 @@ void messageInterrupt(void){
 
 /*** Tarefas ***/
 
-void TaskSender(void *pvParameters) {
+void TaskSender(void *pvParameters) { // Tarefa para enviar frame para outro equipamento
   (void) pvParameters;
   carry_Queue(xQueueSend,frame);
   send_message(xQueueSend);
@@ -306,10 +306,12 @@ void TaskSenderApp(void *pvParameters){
     for(int i = 0; i < 10; i++){
       package.data[i]= random(255);
     }
+    //xQueueSendToBack(xQueueTransmission,(void *)&package,0);
+    
 //    Frame fr1; //não é aqui
 //    frameCreate(fr1,package); // não é aqui
     
-    delay(3000);
+    delay(4000);
   }
 }
 
