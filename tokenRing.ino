@@ -112,17 +112,17 @@ void frameCreate(Frame newFrame, Package p1){
 }
 
 void startByte(TimerHandle_t xTimerSignal){
-  Serial.println("startMessage: Init Transmission");
+  //Serial.println("startMessage: Init Transmission");
   digitalWrite(writerPin,LOW);
   xTimerPeriodicStarted = xTimerStart(xTimerPeriodic,0);// Initializes the timer
 }
 
 void byteGenerator (TimerHandle_t xTimerPeriodic){ //
 
-  if (countBitSend == 0) { // For to test the dataSend
-      Serial.print("Dado a ser enviado:");
-      Serial.println(dataSend);  
-  }
+//  if (countBitSend == 0) { // For to test the dataSend
+//      //Serial.print("Dado a ser enviado:");
+//      //Serial.println(dataSend);  
+//  }
 
   if(flagStopSend){
     xTimerStop(xTimerPeriodic,0);
@@ -158,7 +158,6 @@ void send_message(QueueHandle_t xQueueTemp){ //o envio dos dados que estão na f
   int cont = 0;
 
   while(cont < sizeQueue){ //laço para retirar o dado da fila e iniciar a transmissão
-    //Serial.println("Task Sender: Lendo da fila");
     xQueueReceive(xQueueTemp, &dataSend, portMAX_DELAY);
     xTimerSignalStarted = xTimerStart(xTimerSignal,0);
     cont++;
@@ -188,8 +187,8 @@ void readerByte(TimerHandle_t xTimerReader){
   if(countBitReceived == 8){ //Verifica se os 8 bits foram recebidos
     xTimerStop(xTimerReader,0); 
     attachInterrupt(digitalPinToInterrupt(readerPin), messageInterrupt, FALLING);
-    Serial.print("Dado Recebido: ");
-    Serial.println(dataReceived);
+    //Serial.print("Dado Recebido: ");
+    //Serial.println(dataReceived);
     frameReceived[countByteR-1] = dataReceived;
     
     switch(countByteR){
@@ -197,6 +196,9 @@ void readerByte(TimerHandle_t xTimerReader){
               break;
       case 15: 
               xSemaphoreGive(xSemaphoreRouting);
+              Serial.print("Frame Recebido: ");
+              for(int i=0;i<15;i++) Serial.print(frameReceived[i]);
+              Serial.println("");
               countByteR = 0;
               break;
     }
@@ -207,9 +209,6 @@ void readerByte(TimerHandle_t xTimerReader){
   }
 }
 
-bool checkStx(byte stx){ //Checa se o byte é o STX """MUDAR"""
-  return stx == B00001101;
-}
 
 void checkDestiny(byte mac){ //Checa se o host é o destino
   mac = mac >> 4;
@@ -217,7 +216,6 @@ void checkDestiny(byte mac){ //Checa se o host é o destino
 }
 
 void carryPackageApp(Package * package){ // Transfere os dados do frame recebido para ao pacote da aplicação
-  Serial.println("Entrou aqui na Carry");
   package->mac = frameReceived [1];
   package->port = frameReceived[2];
   int i=3, j=0;
@@ -247,11 +245,10 @@ void sendRetransmition(){ //Carrega o frame com os dados recebidos e envia o fra
   
 }
 
-void routing(){
+void routing(){ // Faz o encaminhamento do pacote a a camada de aplicação ou para a retransmissão
   if(flagIsDestiny){
     Package p1;
     carryPackageApp(&p1);
-    Serial.println(p1.mac);
     xQueueSendToBack(xQueueApp,(void *)&p1,0);
   }else{
     sendRetransmition();
@@ -269,7 +266,14 @@ void packageToFrame(){
 }
 /**** Camada Aplicação *****/
 
-
+void showFrame(Frame f1){
+  Serial.print(f1.stx);
+  Serial.print(f1.mac);
+  Serial.print(f1.port);
+  for(int i=0;i<10;i++) Serial.print(f1.data[i]);
+  Serial.print(f1.bcc);
+  Serial.println(f1.etx);
+}
 /*** Interrupções ***/
 
 void messageInterrupt(void){
@@ -285,6 +289,8 @@ void TaskSender(void *pvParameters) { // Tarefa para enviar frame para outro equ
   for(;;){
     Frame frame1;
     xQueueReceive(xQueueTransmission, &frame1, portMAX_DELAY);
+    Serial.print("Frame enviado: ");
+    showFrame(frame1);
     carry_Queue(xQueueSend,frame1);
     send_message(xQueueSend);
     xSemaphoreTake(xSemaphoreTaskSender,portMAX_DELAY);
