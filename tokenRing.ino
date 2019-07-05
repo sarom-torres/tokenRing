@@ -26,7 +26,6 @@ struct Package{
   byte data[10];
 };
 
-Frame frame;
 
 byte dataSend;
 byte dataReceived; 
@@ -55,7 +54,6 @@ BaseType_t xTimerPeriodicStarted = NULL;
 BaseType_t xTimerReaderStarted = NULL;
 BaseType_t xTimerStartReadingStarted = NULL;
 
-void messageGenerator (TimerHandle_t xTimerPeriodic); // CallBack to writer the mensagem
 void startMessage(TimerHandle_t xTimerSignal); //CallBack to initialize the transmission of the message
 
 void setup() {
@@ -81,7 +79,7 @@ void setup() {
 
   //Data Queues
   xQueueSend = xQueueCreate(15,sizeof(uint8_t)); // Fila que poderia ser um vetor dos bytes enviados
-  xQueueApp = xQueueCreate(2,(sizeof(Package))); // fila para o envio do dado recebido para a aplicação
+  xQueueApp = xQueueCreate(2,(sizeof(Package))); // fila para o envio do dado recebido para a aplicação quando o dispositivo é destino
   xQueueTransmission = xQueueCreate(8,(sizeof(Frame))); // fila para a receber dados da aplicação e enviar para outro equipamento
   xQueueTransApp = xQueueCreate(2,(sizeof(Package))); // fila de pacotes da aplicação
 
@@ -100,16 +98,16 @@ void loop() {
 }
 
 /**** Envio das mensagens ****/
-
-void frameCreate(Frame newFrame, Package p1){
-
-  newFrame.stx = B00000010; // valor binário tabela ASCII 3
-  newFrame.mac = p1.mac;
-  newFrame.port = p1.port;
-  for(int i=0; i<10;i++) newFrame.data[i] = p1.data[i];
-  newFrame.etx = B00000011; // tabela ASCII
-  
-}
+//
+//void frameCreate(Frame newFrame, Package p1){
+//
+//  newFrame.stx = B00000010; // valor binário tabela ASCII 3
+//  newFrame.mac = p1.mac;
+//  newFrame.port = p1.port;
+//  for(int i=0; i<10;i++) newFrame.data[i] = p1.data[i];
+//  newFrame.etx = B00000011; // tabela ASCII
+//  
+//}
 
 void startByte(TimerHandle_t xTimerSignal){
   //Serial.println("startMessage: Init Transmission");
@@ -117,12 +115,7 @@ void startByte(TimerHandle_t xTimerSignal){
   xTimerPeriodicStarted = xTimerStart(xTimerPeriodic,0);// Initializes the timer
 }
 
-void byteGenerator (TimerHandle_t xTimerPeriodic){ //
-
-//  if (countBitSend == 0) { // For to test the dataSend
-//      //Serial.print("Dado a ser enviado:");
-//      //Serial.println(dataSend);  
-//  }
+void byteGenerator (TimerHandle_t xTimerPeriodic){ 
 
   if(flagStopSend){
     xTimerStop(xTimerPeriodic,0);
@@ -197,7 +190,10 @@ void readerByte(TimerHandle_t xTimerReader){
       case 15: 
               xSemaphoreGive(xSemaphoreRouting);
               Serial.print("Frame Recebido: ");
-              for(int i=0;i<15;i++) Serial.print(frameReceived[i]);
+              for(int i=0;i<15;i++){
+                if(i==3 || i==13) Serial.print("-");
+                Serial.print(frameReceived[i]);
+              }
               Serial.println("");
               countByteR = 0;
               break;
@@ -212,7 +208,7 @@ void readerByte(TimerHandle_t xTimerReader){
 
 void checkDestiny(byte mac){ //Checa se o host é o destino
   mac = mac >> 4;
-  if(mac == B00001101) flagIsDestiny = true;
+  if(mac == B00001001) flagIsDestiny = true;
 }
 
 void carryPackageApp(Package * package){ // Transfere os dados do frame recebido para ao pacote da aplicação
@@ -270,7 +266,9 @@ void showFrame(Frame f1){
   Serial.print(f1.stx);
   Serial.print(f1.mac);
   Serial.print(f1.port);
+  Serial.print("-");
   for(int i=0;i<10;i++) Serial.print(f1.data[i]);
+  Serial.print("-");
   Serial.print(f1.bcc);
   Serial.println(f1.etx);
 }
